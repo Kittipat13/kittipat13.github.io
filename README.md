@@ -3,4 +3,4 @@
 # Interactive Computer Graphics
 [คลิกที่นี่เพื่อเล่นโปรแกรม Transformation](./700_Tranformation.html)
 # Paint
-[คลิกที่นี่เพื่อเล่นโปรแกรม Piant](.Paint)
+[คลิกที่นี่เพื่อเล่นโปรแกรม Piant](.paint.html)
