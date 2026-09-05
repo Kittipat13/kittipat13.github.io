@@ -5,3 +5,6 @@
 
 # Paint
 [คลิกที่นี่เพื่อเล่นโปรแกรม Paint](paint.html)
+
+# Next Gen Rendering
+[คลิกที่นี่เพื่อเล่นโปรแกรม Next Gen Rendering](Lighting.html)
