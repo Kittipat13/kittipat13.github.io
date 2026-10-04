@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>3D Portfolio</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    
+    <script>
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 20, 20);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        scene.add(ambientLight);
+
+        const pickables = [];
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+        let picked_object = null;
+
+        renderer.domElement.addEventListener('click', onPick);
+
+        function onPick(e) {
+            const r = renderer.domElement.getBoundingClientRect();
+            const x = (e.clientX ?? e.touches[0].clientX) - r.left;
+            const y = (e.clientY ?? e.touches[0].clientY) - r.top;
+            pointer.x = (x / r.width) * 2 - 1;
+            pointer.y = -(y / r.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(pickables, true); 
+            
+            if (intersects.length > 0) {
+                picked_object = intersects[0].object;
+                console.log('Picked:', picked_object.name);
+            } else {
+                picked_object = null;
+            }
+        }
+
+        const sunUniforms = {
+            uTime: { value: 0.0 },
+            uLightDir: { value: new THREE.Vector3(1.0, 1.0, 1.0).normalize() },
+            uColor: { value: new THREE.Color(0xffaa00) }
+        };
+
+        const sunVertexShader = `
+            uniform float uTime;
+            varying vec3 vNormal;
+
+            void main() {
+                vNormal = normal;
+                vec3 pos = position;
+                
+                float displacement = sin(pos.x * 5.0 + uTime * 3.0) * sin(pos.y * 5.0 + uTime * 3.0) * 0.1;
+                pos += normal * displacement;
+                
+                gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(pos, 1.0);
+            }
+        `;
+
+        const sunFragmentShader = `
+            precision mediump float;
+            uniform vec3 uLightDir;
+            uniform vec3 uColor;
+            varying vec3 vNormal;
+
+            void main() {
+                vec3 N = normalize(vNormal);
+                vec3 L = normalize(uLightDir);
+                
+                float diffuse = max(dot(N, L), 0.0);
+                float ambient = 0.7;
+
+                diffuse = smoothstep(0.4, 0.45, diffuse);
+
+                vec3 finalColor = uColor * (diffuse + ambient);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        const sunGeo = new THREE.SphereGeometry(1.5, 64, 64);
+        const sunMat = new THREE.ShaderMaterial({
+            vertexShader: sunVertexShader,
+            fragmentShader: sunFragmentShader,
+            uniforms: sunUniforms,
+            side: THREE.DoubleSide
+        });
+
+        const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        sunMesh.position.set(-5, 8, -5);
+        sunMesh.name = "CartoonSun";
+        scene.add(sunMesh);
+        pickables.push(sunMesh); 
+
+        let mixer; 
+        const clock = new THREE.Clock(); 
+        
+        const loader = new THREE.GLTFLoader();
+        loader.load("https://kittipat13.github.io/Doremon5.glb", function (gltf) {
+            scene.add(gltf.scene);
+            pickables.push(gltf.scene);
+            
+            if (gltf.animations && gltf.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(gltf.scene);
+                gltf.animations.forEach((clip) => {
+                    mixer.clipAction(clip).play();
+                });
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate(time) {
+            const delta = clock.getDelta();
+            if (mixer) {
+                mixer.update(delta);
+            }
+
+            sunUniforms.uTime.value = time * 0.002;
+            
+            sunMesh.rotation.y += 0.005;
+            sunMesh.rotation.z += 0.002;
+
+            if (picked_object != null) {
+                const targetPos = new THREE.Vector3();
+                picked_object.getWorldPosition(targetPos);
+                controls.target.lerp(targetPos, 0.05);
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        animate(0);
+    </script>
+</body>
+</html>
